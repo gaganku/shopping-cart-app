@@ -1163,6 +1163,39 @@
                     const tbody = document.getElementById('users-tbody');
                     tbody.innerHTML = '';
 
+                    data.users.forEach(user => {
+                        const row = document.createElement('tr');
+                        const isCurrentAdmin = user.username === 'admin'; // Prevent deleting main admin
+                        
+                        row.innerHTML = `
+                            <td>
+                                <div style="display: flex; align-items: center; gap: 1rem;">
+                                    <input type="checkbox" class="user-checkbox" data-user-id="${user._id}" data-username="${user.username}" data-email="${user.email || ''}" ${isCurrentAdmin ? 'disabled' : ''}>
+                                    <div class="user-avatar">${user.username.charAt(0).toUpperCase()}</div>
+                                    <span>${user.username}</span>
+                                </div>
+                            </td>
+                            <td>${user.email || 'N/A'}</td>
+                            <td>
+                                <span class="status-badge ${user.isVerified ? 'status-verified' : 'status-pending'}">
+                                    ${user.isVerified ? 'Verified' : 'Pending'}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="status-badge ${user.isAdmin ? 'badge-role-admin' : 'badge-role-user'}">
+                                    ${user.isAdmin ? 'Admin' : 'User'}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="status-badge ${user.isAdmin ? 'badge-access-yes' : 'badge-access-no'}">
+                                    ${user.isAdmin ? 'Yes' : 'No'}
+                                </span>
+                            </td>
+                            <td>${new Date(user.createdAt).toLocaleDateString()}</td>
+                            <td>
+                                <button class="upload-btn" style="width: auto; margin: 0; padding: 0.25rem 0.75rem; font-size: 0.8rem;" 
+                                    onclick="openEditUserModal('${user._id}', '${user.username}', '${user.email || ''}', ${user.isVerified}, ${user.isAdmin})">
+                                    Edit
                                 </button>
                             </td>
                         `;
