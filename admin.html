@@ -892,6 +892,41 @@
         </div>
     </div>
 
+    <!-- Edit User Modal -->
+    <div id="edit-user-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit User</h3>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="edit-user-id">
+                <div class="form-group">
+                    <label for="edit-username">Username</label>
+                    <input type="text" id="edit-username" class="form-input" readonly style="opacity: 0.7; cursor: not-allowed;">
+                </div>
+                <div class="form-group">
+                    <label for="edit-email">Email</label>
+                    <input type="email" id="edit-email" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>Status</label>
+                    <div style="display: flex; gap: 1rem; margin-top: 0.5rem;">
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <input type="checkbox" id="edit-is-verified"> Verified
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <input type="checkbox" id="edit-is-admin"> Admin
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn modal-btn-cancel" onclick="closeEditUserModal()">Cancel</button>
+                <button class="modal-btn" style="background: var(--primary); color: white;" onclick="saveUserChanges()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Success Notification Toast -->
     <div id="success-notification" class="notification-toast">
         <div class="notification-content">
@@ -1174,7 +1209,10 @@
                             <td>${user.isAdmin ? 'Yes' : 'No'}</td>
                             <td>${new Date(user.createdAt).toLocaleDateString()}</td>
                             <td>
-                                <button class="upload-btn" style="width: auto; margin: 0; padding: 0.25rem 0.75rem; font-size: 0.8rem;" onclick="alert('Edit feature coming soon')">Edit</button>
+                                <button class="upload-btn" style="width: auto; margin: 0; padding: 0.25rem 0.75rem; font-size: 0.8rem;" 
+                                    onclick="openEditUserModal('${user._id}', '${user.username}', '${user.email || ''}', ${user.isVerified}, ${user.isAdmin})">
+                                    Edit
+                                </button>
                             </td>
                         `;
                         tbody.appendChild(row);
@@ -1270,6 +1308,58 @@
             modal.classList.remove('active');
             pendingDeleteData = null;
         }
+
+        // Edit User Modal Logic
+        function openEditUserModal(id, username, email, isVerified, isAdmin) {
+            document.getElementById('edit-user-id').value = id;
+            document.getElementById('edit-username').value = username;
+            document.getElementById('edit-email').value = email;
+            document.getElementById('edit-is-verified').checked = isVerified;
+            document.getElementById('edit-is-admin').checked = isAdmin;
+            
+            document.getElementById('edit-user-modal').classList.add('active');
+        }
+
+        function closeEditUserModal() {
+            document.getElementById('edit-user-modal').classList.remove('active');
+        }
+
+        async function saveUserChanges() {
+            const id = document.getElementById('edit-user-id').value;
+            const email = document.getElementById('edit-email').value;
+            const isVerified = document.getElementById('edit-is-verified').checked;
+            const isAdmin = document.getElementById('edit-is-admin').checked;
+
+            try {
+                const response = await fetch(`/api/admin/users/${id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({ email, isVerified, isAdmin })
+                });
+
+                if (response.ok) {
+                    closeEditUserModal();
+                    showNotification(`User updated successfully`);
+                    loadUsers();
+                } else {
+                    const error = await response.json();
+                    alert('Failed to update user: ' + (error.error || 'Unknown error'));
+                }
+            } catch (err) {
+                console.error('Error updating user:', err);
+                alert('Error updating user');
+            }
+        }
+
+        // Close modal when clicking outside
+        document.getElementById('edit-user-modal').addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal-overlay')) {
+                closeEditUserModal();
+            }
+        });
 
         // Modal cancel button
         document.getElementById('modal-cancel').addEventListener('click', hideDeleteModal);

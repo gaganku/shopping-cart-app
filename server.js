@@ -983,6 +983,39 @@ app.post('/api/admin/users/bulk-delete', isAdmin, async (req, res) => {
     }
 });
 
+// Admin: Update user details
+app.put('/api/admin/users/:id', isAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { email, isVerified, isAdmin } = req.body;
+
+        // Prevent modifying the main admin account's critical fields
+        const userToUpdate = await User.findById(id);
+        if (!userToUpdate) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        if (userToUpdate.username === 'admin' && (isVerified === false || isAdmin === false)) {
+             return res.status(403).json({ error: 'Cannot remove admin status or verification from the main admin account' });
+        }
+
+        const updatedUser = await User.findByIdAndUpdate(
+            id,
+            { 
+                email, 
+                isVerified, 
+                isAdmin 
+            },
+            { new: true }
+        );
+
+        res.json({ message: 'User updated successfully', user: updatedUser });
+    } catch (err) {
+        console.error('Error updating user:', err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
 });
