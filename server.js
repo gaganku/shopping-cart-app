@@ -204,29 +204,180 @@ app.get('/auth/google',
 
 app.get('/auth/google/callback',
     (req, res, next) => {
-        passport.authenticate('google', (err, user, info) => {
-            if (err) {
-                return next(err);
+        passport.authenticate('google', async (err, user, info) => {
+            if (err) { return next(err); }
+            
+            // Get profile from user (if exists) or info (if new)
+            // Note: user is false if not found in DB (from strategy)
+            const profile = user ? { ...user.toObject(), existingUser: true } : info.profile;
+            
+            console.log('Debug - User found:', !!user);
+            console.log('Debug - Profile keys:', Object.keys(profile));
+            if (profile.emails) console.log('Debug - Profile emails:', profile.emails);
+            if (user) console.log('Debug - User email from DB:', user.email);
+
+            const email = profile.emails && profile.emails[0] ? profile.emails[0].value : (user ? user.email : null);
+
+            if (!email) {
+                console.error('Debug - No email found for user/profile');
+                return res.redirect('/login.html?error=no_email');
             }
-            if (!user) {
-                // If user not found, check if we have profile info to complete signup
-                if (info && info.profile) {
-                    req.session.googleProfile = info.profile;
-                    return res.redirect('/complete-profile.html');
+
+            // Generate OTP
+            const otp = Math.floor(100000 + Math.random() * 900000).toString();
+            
+            // Store in session
+            req.session.googleAuth = {
+                profile: profile,
+                otp: otp,
+                otpExpires: Date.now() + 10 * 60 * 1000, // 10 mins
+                isExistingUser: !!user,
+                userId: user ? user._id : null
+            };
+
+            // Send OTP Email
+            if (transporter) {
+                try {
+                    const info = await transporter.sendMail({
+                        from: '"ModernShop" <noreply@modernshop.com>',
+                        to: email,
+                        subject: 'Verify your Google Login',
+                        html: `
+                            <div style="font-family: Arial, sans-serif; padding: 20px;">
+                                <h2>Google Login Verification</h2>
+                                <p>Please use the following OTP to verify your identity:</p>
+                                <h1 style="color: #667eea; letter-spacing: 5px;">${otp}</h1>
+                                <p>This code expires in 10 minutes.</p>
+                            </div>
+                        `
+                    });
+                    const etherealUrl = nodemailer.getTestMessageUrl(info);
+                    if (etherealUrl) {
+                        console.log('Google OTP email sent: %s', etherealUrl);
+                        const { exec } = require('child_process');
+                        exec(`start ${etherealUrl}`);
+                    }
+                } catch (emailErr) {
+                    console.error('Error sending Google OTP:', emailErr);
                 }
-                // Fallback to error if no profile info (shouldn't happen with updated strategy)
-                return res.redirect('/login.html?error=not_registered');
             }
-            req.logIn(user, (err) => {
-                if (err) {
-                    return next(err);
-                }
-                console.log('OAuth callback successful!');
-                return res.redirect('/index.html');
-            });
+
+            res.redirect('/google-otp.html');
         })(req, res, next);
     }
 );
+
+// Google Auth: Verify OTP
+app.post('/api/auth/google/verify-otp', async (req, res) => {
+    try {
+        const { otp } = req.body;
+        const sessionData = req.session.googleAuth;
+
+        if (!sessionData || !sessionData.otp) {
+            return res.status(400).json({ error: 'Session expired or invalid' });
+        }
+
+        if (Date.now() > sessionData.otpExpires) {
+            return res.status(400).json({ error: 'OTP expired' });
+        }
+
+        if (sessionData.otp !== otp) {
+            return res.status(400).json({ error: 'Invalid OTP' });
+        }
+
+        // OTP Valid
+        if (sessionData.isExistingUser) {
+            // Log in existing user
+            const user = await User.findById(sessionData.userId);
+            if (!user) return res.status(404).json({ error: 'User not found' });
+
+            req.login(user, (err) => {
+                if (err) return res.status(500).json({ error: 'Login failed' });
+                delete req.session.googleAuth; // Clear session data
+                res.json({ message: 'Login successful' });
+            });
+        } else {
+            // New user - allow to proceed to completion
+            // Don't clear session yet, we need profile data for completion
+            sessionData.otpVerified = true;
+            res.json({ message: 'OTP verified', redirect: '/google-complete.html' });
+        }
+    } catch (err) {
+        console.error('Google OTP Verify Error:', err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// Google Auth: Complete Profile
+app.post('/api/auth/google/complete', async (req, res) => {
+    try {
+        const { username, phone } = req.body;
+        const sessionData = req.session.googleAuth;
+
+        if (!sessionData || !sessionData.otpVerified) {
+            return res.status(403).json({ error: 'Unauthorized' });
+        }
+
+        // Check if username taken
+        const existingUser = await User.findOne({ username });
+        if (existingUser) {
+            return res.status(400).json({ error: 'Username already taken' });
+        }
+
+        const profile = sessionData.profile;
+        const email = profile.emails[0].value;
+
+        const newUser = new User({
+            username,
+            email,
+            googleId: profile.id,
+            displayName: profile.displayName,
+            phoneNumber: phone,
+            isVerified: false // User requested to set this to false initially
+        });
+
+        await newUser.save();
+
+        // Send Welcome Email
+        if (transporter) {
+            try {
+                const welcomeEmail = await transporter.sendMail({
+                    from: '"ModernShop" <noreply@modernshop.com>',
+                    to: email,
+                    subject: 'Welcome to ModernShop! 🎉',
+                    html: `
+                        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 16px;">
+                            <div style="background: white; border-radius: 12px; padding: 30px; box-shadow: 0 8px 32px rgba(0,0,0,0.1);">
+                                <h1 style="color: #667eea; margin: 0 0 20px 0; font-size: 28px;">Welcome, ${username}! 🚀</h1>
+                                <p style="font-size: 16px; color: #333; line-height: 1.6;">Your account has been successfully created.</p>
+                                <p style="font-size: 16px; color: #333; line-height: 1.6;">We're thrilled to have you on board!</p>
+                            </div>
+                        </div>
+                    `
+                });
+                const etherealUrl = nodemailer.getTestMessageUrl(welcomeEmail);
+                if (etherealUrl) {
+                    console.log('Welcome email sent: %s', etherealUrl);
+                    const { exec } = require('child_process');
+                    exec(`start ${etherealUrl}`);
+                }
+            } catch (emailErr) {
+                console.error('Error sending welcome email:', emailErr);
+            }
+        }
+
+        // Login
+        req.login(newUser, (err) => {
+            if (err) return res.status(500).json({ error: 'Login failed' });
+            delete req.session.googleAuth;
+            res.json({ message: 'Account created and logged in' });
+        });
+
+    } catch (err) {
+        console.error('Google Complete Error:', err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
 
 // Check authentication status
 app.get('/api/auth/status', (req, res) => {
@@ -364,6 +515,34 @@ app.get('/api/verify', async (req, res) => {
         user.verificationToken = undefined;
         await user.save();
 
+        // Send Welcome Email
+        if (user.email && transporter) {
+            try {
+                const welcomeEmail = await transporter.sendMail({
+                    from: '"ModernShop" <noreply@modernshop.com>',
+                    to: user.email,
+                    subject: 'Welcome to ModernShop! 🎉',
+                    html: `
+                        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 16px;">
+                            <div style="background: white; border-radius: 12px; padding: 30px; box-shadow: 0 8px 32px rgba(0,0,0,0.1);">
+                                <h1 style="color: #667eea; margin: 0 0 20px 0; font-size: 28px;">Welcome to ModernShop! 🚀</h1>
+                                <p style="font-size: 16px; color: #333; line-height: 1.6;">Hi ${user.username},</p>
+                                <p style="font-size: 16px; color: #333; line-height: 1.6;">Your account has been successfully verified. We're thrilled to have you on board!</p>
+                                <p style="font-size: 16px; color: #333; line-height: 1.6;">You can now login and start shopping for the best tech gadgets.</p>
+                                <div style="text-align: center; margin-top: 30px;">
+                                    <a href="http://localhost:3000/login.html" style="background: #667eea; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold; display: inline-block;">Login Now</a>
+                                </div>
+                            </div>
+                        </div>
+                    `
+                });
+                const etherealUrl = nodemailer.getTestMessageUrl(welcomeEmail);
+                if (etherealUrl) console.log('Welcome email sent: %s', etherealUrl);
+            } catch (emailErr) {
+                console.error('Error sending welcome email:', emailErr);
+            }
+        }
+
         res.redirect('/login.html?verified=true');
     } catch (err) {
         console.error('Verification error:', err);
@@ -399,6 +578,93 @@ app.post('/api/login', async (req, res) => {
             res.status(401).json({ error: 'Invalid credentials' });
         }
     } catch (err) {
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// OTP Login: Request OTP
+app.post('/api/auth/otp/request', async (req, res) => {
+    try {
+        const { email } = req.body; // User enters email (or username)
+        
+        // Find user by email or username
+        const user = await User.findOne({ $or: [{ email }, { username: email }] });
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Generate 6-digit OTP
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+        user.otpCode = otp;
+        user.otpExpires = otpExpires;
+        await user.save();
+
+        // Send OTP via Email
+        if (transporter && user.email) {
+            const info = await transporter.sendMail({
+                from: '"ModernShop" <noreply@modernshop.com>',
+                to: user.email,
+                subject: 'Your Login OTP',
+                html: `
+                    <div style="font-family: Arial, sans-serif; padding: 20px;">
+                        <h2>Login OTP</h2>
+                        <p>Your One-Time Password (OTP) for login is:</p>
+                        <h1 style="color: #667eea; letter-spacing: 5px;">${otp}</h1>
+                        <p>This code expires in 10 minutes.</p>
+                    </div>
+                `
+            });
+            const etherealUrl = nodemailer.getTestMessageUrl(info);
+            if (etherealUrl) {
+                console.log('OTP email sent: %s', etherealUrl);
+                // Auto-open for dev convenience
+                 const { exec } = require('child_process');
+                 exec(`start ${etherealUrl}`);
+            }
+        }
+
+        res.json({ message: 'OTP sent successfully' });
+    } catch (err) {
+        console.error('OTP request error:', err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// OTP Login: Verify OTP
+app.post('/api/auth/otp/verify', async (req, res) => {
+    try {
+        const { email, otp } = req.body;
+        
+        const user = await User.findOne({ $or: [{ email }, { username: email }] });
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        if (!user.otpCode || !user.otpExpires) {
+            return res.status(400).json({ error: 'No OTP requested' });
+        }
+
+        if (Date.now() > user.otpExpires) {
+            return res.status(400).json({ error: 'OTP expired' });
+        }
+
+        if (user.otpCode !== otp) {
+            return res.status(400).json({ error: 'Invalid OTP' });
+        }
+
+        // OTP Valid - Login User
+        user.otpCode = undefined;
+        user.otpExpires = undefined;
+        await user.save();
+
+        req.login(user, (err) => {
+            if (err) return res.status(500).json({ error: 'Login failed' });
+            res.json({ message: 'Login successful', username: user.username, isAdmin: user.isAdmin });
+        });
+    } catch (err) {
+        console.error('OTP verify error:', err);
         res.status(500).json({ error: 'Server error' });
     }
 });

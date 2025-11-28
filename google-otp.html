@@ -3,318 +3,152 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Security Verification</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <title>Verify Login | ModernShop</title>
+    <link rel="stylesheet" href="style.css">
     <style>
         :root {
             --primary: #8b5cf6;
-            --secondary: #ec4899;
-            --bg-dark: #0f172a;
-            --glass: rgba(30, 41, 59, 0.7);
-            --glass-border: rgba(255, 255, 255, 0.1);
+            --bg: #0f172a;
+            --surface: rgba(30, 41, 59, 0.7);
+            --text: #f8fafc;
         }
-
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-
         body {
-            font-family: 'Outfit', sans-serif;
-            background: var(--bg-dark);
-            color: #f8fafc;
             display: flex;
             justify-content: center;
             align-items: center;
             min-height: 100vh;
-            overflow: hidden;
-            position: relative;
+            background-color: var(--bg);
+            background-image: 
+                radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), 
+                radial-gradient(at 50% 0%, hsla(225,39%,30%,1) 0, transparent 50%), 
+                radial-gradient(at 100% 0%, hsla(339,49%,30%,1) 0, transparent 50%);
+            font-family: 'Outfit', sans-serif;
+            margin: 0;
+            color: var(--text);
         }
-
-        /* Animated Background Blobs */
-        .blob {
-            position: absolute;
-            width: 500px;
-            height: 500px;
-            background: linear-gradient(180deg, var(--primary), var(--secondary));
-            filter: blur(80px);
-            opacity: 0.2;
-            border-radius: 50%;
-            z-index: -1;
-            animation: float 10s infinite alternate;
-        }
-        .blob:nth-child(1) { top: -100px; left: -100px; }
-        .blob:nth-child(2) { bottom: -100px; right: -100px; animation-delay: -5s; }
-
-        @keyframes float {
-            0% { transform: translate(0, 0) scale(1); }
-            100% { transform: translate(30px, 50px) scale(1.1); }
-        }
-
-        .container {
-            background: var(--glass);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid var(--glass-border);
+        .card {
+            background: var(--surface);
             padding: 3rem;
             border-radius: 24px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
             width: 100%;
-            max-width: 420px;
+            max-width: 400px;
             text-align: center;
-            animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
-
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(40px); }
-            to { opacity: 1; transform: translateY(0); }
+        @keyframes popIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
         }
-
-        h2 {
+        .title {
             font-size: 2rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-            background: linear-gradient(135deg, #fff, #cbd5e1);
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
-
-        p {
-            color: #94a3b8;
-            margin-bottom: 2rem;
-            font-size: 0.95rem;
-            line-height: 1.5;
+        .input-group {
+            margin-bottom: 1.5rem;
         }
-
-        .otp-inputs {
-            display: flex;
-            gap: 12px;
-            justify-content: center;
-            margin-bottom: 2rem;
-        }
-
-        .otp-inputs input {
-            width: 48px;
-            height: 56px;
+        input {
+            width: 100%;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 12px;
-            border: 2px solid var(--glass-border);
-            background: rgba(15, 23, 42, 0.6);
-            color: #fff;
+            color: white;
             font-size: 1.5rem;
-            font-weight: 600;
             text-align: center;
-            transition: all 0.2s ease;
+            letter-spacing: 0.5rem;
             outline: none;
+            transition: all 0.3s;
         }
-
-        .otp-inputs input:focus {
+        input:focus {
             border-color: var(--primary);
-            box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.15);
-            transform: translateY(-2px);
+            box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.1);
         }
-
-        .otp-inputs input.filled {
-            border-color: var(--secondary);
-        }
-
         button {
             width: 100%;
             padding: 1rem;
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            color: #fff;
+            background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+            color: white;
             border: none;
             border-radius: 12px;
-            font-size: 1rem;
-            font-weight: 600;
+            font-size: 1.1rem;
+            font-weight: bold;
             cursor: pointer;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
+            transition: transform 0.2s;
         }
-
         button:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(236, 72, 153, 0.3);
         }
-
-        button:active {
-            transform: translateY(0);
-        }
-
-        button::after {
-            content: '';
-            position: absolute;
-            top: 0; left: -100%;
-            width: 100%; height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-            transition: 0.5s;
-        }
-
-        button:hover::after {
-            left: 100%;
-        }
-
-        #msg {
-            margin-top: 1.5rem;
-            padding: 0.75rem;
-            border-radius: 8px;
-            font-size: 0.9rem;
-            display: none;
-            animation: shake 0.4s ease-in-out;
-        }
-
-        .error-msg {
-            background: rgba(244, 63, 94, 0.1);
-            color: #f43f5e;
-            border: 1px solid rgba(244, 63, 94, 0.2);
-        }
-
-        @keyframes shake {
-            0%, 100% { transform: translateX(0); }
-            25% { transform: translateX(-5px); }
-            75% { transform: translateX(5px); }
-        }
-
         .resend {
-            margin-top: 1.5rem;
+            margin-top: 1rem;
             font-size: 0.9rem;
-            color: #64748b;
+            color: #94a3b8;
+            cursor: pointer;
         }
-        .resend a {
-            color: var(--primary);
-            text-decoration: none;
-            font-weight: 500;
-            transition: color 0.2s;
+        .resend:hover {
+            color: white;
+            text-decoration: underline;
         }
-        .resend a:hover { color: var(--secondary); }
-
     </style>
 </head>
 <body>
-
-    <div class="blob"></div>
-    <div class="blob"></div>
-
-    <div class="container">
-        <h2>Verification</h2>
-        <p>We've sent a 6-digit code to your device.<br>Please enter it below to continue.</p>
+    <div class="card">
+        <h1 class="title">Verify It's You</h1>
+        <p style="margin-bottom: 2rem; color: #cbd5e1;">We've sent a verification code to your email.</p>
         
-        <div class="otp-inputs" id="otp-container">
-            <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" autocomplete="one-time-code">
-            <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric">
-            <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric">
-            <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric">
-            <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric">
-            <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric">
+        <div class="input-group">
+            <input type="text" id="otp-input" maxlength="6" placeholder="000000" autofocus>
         </div>
-
-        <button id="verifyBtn">Verify Identity</button>
-
-        <div id="msg"></div>
         
-        <div class="resend">
-            Didn't receive code? <a href="#" onclick="alert('Resend feature coming soon!')">Resend</a>
-        </div>
+        <button id="verify-btn">Verify Code</button>
+        <div class="resend" id="resend-btn">Resend Code</div>
     </div>
 
-<script>
-    const inputs = document.querySelectorAll('.otp-inputs input');
-    const verifyBtn = document.getElementById('verifyBtn');
-    const msgDiv = document.getElementById('msg');
+    <script>
+        const verifyBtn = document.getElementById('verify-btn');
+        const otpInput = document.getElementById('otp-input');
 
-    // Auto-focus logic
-    inputs.forEach((input, index) => {
-        input.addEventListener('keydown', (e) => {
-            if (e.key >= 0 && e.key <= 9) {
-                input.value = ''; // Clear before typing new digit
-            } else if (e.key === 'Backspace') {
-                if (!input.value && index > 0) {
-                    inputs[index - 1].focus();
-                }
+        verifyBtn.addEventListener('click', async () => {
+            const otp = otpInput.value.trim();
+            if (otp.length !== 6) {
+                alert('Please enter a valid 6-digit code');
+                return;
             }
-        });
 
-        input.addEventListener('input', (e) => {
-            const val = e.target.value;
-            if (val) {
-                input.classList.add('filled');
-                if (index < inputs.length - 1) {
-                    inputs[index + 1].focus();
+            verifyBtn.textContent = 'Verifying...';
+            verifyBtn.disabled = true;
+
+            try {
+                const res = await fetch('/api/auth/google/verify-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ otp })
+                });
+                const data = await res.json();
+
+                if (res.ok) {
+                    if (data.redirect) {
+                        window.location.href = data.redirect;
+                    } else {
+                        window.location.href = '/index.html';
+                    }
+                } else {
+                    alert(data.error || 'Verification failed');
+                    verifyBtn.textContent = 'Verify Code';
+                    verifyBtn.disabled = false;
                 }
-            } else {
-                input.classList.remove('filled');
-            }
-        });
-
-        // Paste support
-        input.addEventListener('paste', (e) => {
-            e.preventDefault();
-            const pasteData = e.clipboardData.getData('text').slice(0, 6).split('');
-            pasteData.forEach((char, i) => {
-                if (inputs[i]) {
-                    inputs[i].value = char;
-                    inputs[i].classList.add('filled');
-                }
-            });
-            if (inputs[pasteData.length - 1]) {
-                inputs[pasteData.length - 1].focus();
-            } else {
-                inputs[5].focus();
-            }
-        });
-    });
-
-    // Verify logic
-    verifyBtn.addEventListener('click', async () => {
-        let otp = '';
-        inputs.forEach(input => otp += input.value);
-
-        if (otp.length !== 6) {
-            showError('Please enter the full 6-digit code');
-            return;
-        }
-        
-        // Get userId from URL query params
-        const urlParams = new URLSearchParams(window.location.search);
-        const userId = urlParams.get('userId');
-
-        verifyBtn.textContent = 'Verifying...';
-        verifyBtn.disabled = true;
-        msgDiv.style.display = 'none';
-
-        try {
-            const res = await fetch('/api/auth/verify-2fa', {
-                method: 'POST',
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ otp, userId }) 
-            });
-            const data = await res.json();
-            
-            if (res.ok) {
-                verifyBtn.textContent = 'Success!';
-                verifyBtn.style.background = '#10b981';
-                setTimeout(() => {
-                    window.location.href = '/index.html';
-                }, 500);
-            } else {
-                showError(data.error || 'Verification failed');
-                verifyBtn.textContent = 'Verify Identity';
+            } catch (err) {
+                console.error(err);
+                alert('An error occurred');
+                verifyBtn.textContent = 'Verify Code';
                 verifyBtn.disabled = false;
             }
-        } catch (e) {
-            showError('Network error. Please try again.');
-            verifyBtn.textContent = 'Verify Identity';
-            verifyBtn.disabled = false;
-        }
-    });
-
-    function showError(message) {
-        msgDiv.textContent = message;
-        msgDiv.className = 'error-msg';
-        msgDiv.style.display = 'block';
-        // Re-trigger animation
-        msgDiv.style.animation = 'none';
-        msgDiv.offsetHeight; /* trigger reflow */
-        msgDiv.style.animation = 'shake 0.4s ease-in-out';
-    }
-</script>
+        });
+    </script>
 </body>
 </html>
